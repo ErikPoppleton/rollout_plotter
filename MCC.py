@@ -121,7 +121,7 @@ def main(rank):
     ROLLOUT_ENERGY = 5
     sort = all_data[DATA_DIFF].argsort()
     all_data = all_data[:,sort]
-    names = np.array(names)[sort]
+    names = np.array(names, dtype=str)[sort]
     families = np.array(families)[sort]
 
 
@@ -134,9 +134,10 @@ def main(rank):
 
     mpl.rcParams.update({'font.size': 22})
     mpl.rc('text', usetex=True)
+    mpl.rc('xtick', labelsize=18)
+    mpl.rc('ytick', labelsize=18)
 
     #how accurate is foldability??
-    plt.clf()
     plt.figure()
     fnames = sorted(list(set(families)))
     for fname in fnames:
@@ -150,63 +151,61 @@ def main(rank):
         plt.plot(modelX, modelY)
     plt.xlabel("ENTRNA foldability")
     plt.ylabel("MCC")
-    plt.legend()
+    plt.legend(fontsize=14)
     plt.tight_layout()
     plt.savefig("foldability_{}.pdf".format(out_number))
+    plt.close()
 
     #comparison scatterplot
-    plt.clf()
     plt.figure()
     for fname in fnames:
-        plt.scatter(all_data[DATA_FOLD][families == fname], all_data[DATA_ROLL][families == fname], label=fname)
+        plt.scatter(all_data[DATA_FOLD][families == fname], all_data[DATA_ROLL][families == fname], label=fname, alpha=0.4)
         plt.xlabel("RNAfold MCC")
         plt.ylabel("Rollout MCC")
-        plt.legend()
+        plt.legend(fontsize=14)
         plt.tight_layout()
         plt.savefig("scatter_comparison_{}.pdf".format(out_number))
+    plt.close()
 
     #histograms!
-    plt.clf()
     plt.figure()
     #overlay
     plt.hist(data_fold, bins=50, range=(-1, 1), alpha=0.4, label="RNAfold")
     plt.hist(data_roll, bins=50, range=(-1, 1), alpha=0.4, label="Rollout")
     plt.xlabel("Matthews Correlation Coefficient")
     plt.ylabel("Number")
-    plt.legend()
+    plt.legend(fontsize=14)
     plt.tight_layout()
     plt.savefig("comparison_{}.pdf".format(out_number))
+    plt.close()
 
     #difference
-    plt.clf()
     plt.hist(data_diff, bins=20)
     plt.xlabel("MCC difference (Rollout-RNAfold)")
     plt.ylabel("Number")
     plt.savefig("diff_{}.pdf".format(out_number))
+    plt.close()
 
-
-
-    plt.clf()
-    plt.figure(figsize=(200, 20))
-    ma = np.max(np.array([np.max(all_data[RNAFOLD_ENERGY]), np.max(all_data[ROLLOUT_ENERGY])]))
-    mi = np.min(np.array([np.min(all_data[RNAFOLD_ENERGY]), np.min(all_data[ROLLOUT_ENERGY])]))
-    #cmap = mpl.cm.viridis
-    #norm = mpl.colors.Normalize(vmin=mi, vmax=ma)
-    a = plt.scatter(range(len(all_data[DATA_FOLD])), all_data[DATA_FOLD], c=all_data[RNAFOLD_ENERGY], cmap='viridis', vmin=mi, vmax=ma, marker='o', label="RNAfold")
-    b = plt.scatter(range(len(all_data[DATA_FOLD])), all_data[DATA_ROLL], c=all_data[ROLLOUT_ENERGY], cmap='viridis', vmin=mi, vmax=ma, marker='v', label="Rollout")
-    plt.legend(handles=[a, b])
-    plt.colorbar(label='Free energy')
-    plt.xlabel("Structure")
-    plt.ylabel("MCC")
-    plt.xticks(range(len(all_data[DATA_FOLD])), names, rotation='vertical', fontsize=6)
-    plt.xlim((-0.5, len(all_data[DATA_FOLD])+0.5))
-    plt.ylim((-1.1, 1.1))
-    plt.tight_layout() 
-    plt.tight_layout()   
-    plt.savefig("all_data_{}.pdf".format(out_number))
+    #plt.figure(figsize=(len(all_data[DATA_FOLD])/18, 20))
+    #ma = np.max(np.array([np.max(all_data[RNAFOLD_ENERGY]), np.max(all_data[ROLLOUT_ENERGY])]))
+    #mi = np.min(np.array([np.min(all_data[RNAFOLD_ENERGY]), np.min(all_data[ROLLOUT_ENERGY])]))
+    ##cmap = mpl.cm.viridis
+    ##norm = mpl.colors.Normalize(vmin=mi, vmax=ma)
+    #a = plt.scatter(range(len(all_data[DATA_FOLD])), all_data[DATA_FOLD], c=all_data[RNAFOLD_ENERGY], cmap='viridis', vmin=mi, vmax=ma, marker='o', label="RNAfold")
+    #b = plt.scatter(range(len(all_data[DATA_FOLD])), all_data[DATA_ROLL], c=all_data[ROLLOUT_ENERGY], cmap='viridis', vmin=mi, vmax=ma, marker='v', label="Rollout")
+    #plt.legend(handles=[a, b], fontsize=14)
+    #plt.colorbar(label='Free energy')
+    #plt.xlabel("Structure")
+    #plt.ylabel("MCC")
+    #plt.xticks(range(len(all_data[DATA_FOLD])), [n.replace('_', r'\_') for n in names], rotation='vertical', fontsize=6)
+    #plt.xlim((-0.5, len(all_data[DATA_FOLD])+0.5))
+    #plt.ylim((-1.1, 1.1))
+    #plt.tight_layout() 
+    #plt.savefig("all_data_{}.pdf".format(out_number))
+    #plt.close()
 
 if __name__ == "__main__":
     print('\tavg_fold\tavg_mcc\tmedian_mcc\tavg_improvement')
-    #for i in range(5):
-    #    main(i)
-    main(1)
+    for i in range(5):
+        main(i)
+    #main(0)
