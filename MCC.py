@@ -4,6 +4,8 @@ from os import listdir
 import matplotlib.pyplot as plt
 import matplotlib as mpl
 from sklearn.linear_model import LinearRegression
+from scipy.optimize import curve_fit
+from scipy.stats import ttest_ind
 
 def calc_MCC(prediction, actual, name, alg):
     TP = 0
@@ -77,7 +79,12 @@ def main(rank):
     actual_energy = []
     RNAfold_energy = []
     rollout_energy = []
+    runtime = []
+    actual_MFE = []
+    RNAfold_MFE = []
+    rollout_MFE = []
     names = []
+    seq_lens = []
     families = []
     for fname in listdir():
         if fname.split(".")[-1] == "csv":
@@ -89,6 +96,7 @@ def main(rank):
                         continue
                     name = l[0]
                     seq = l[1]
+                    seq_lens.append(len(seq))
                     actual = l[2]
                     RNAfold = l[3]
                     rollout = l[4]
@@ -96,6 +104,10 @@ def main(rank):
                     actual_energy.append(float(l[5]))
                     RNAfold_energy.append(float(l[6]))
                     rollout_energy.append(float(l[7]))
+                    runtime.append(float(l[15]))
+                    actual_MFE.append(float(l[25]))
+                    RNAfold_MFE.append(float(l[26]))
+                    rollout_MFE.append(float(l[27]))
                     
                     make_fasta_db(name, "actual", seq, actual)
                     make_fasta_db(name, "RNAfold", seq, RNAfold)
@@ -112,20 +124,26 @@ def main(rank):
                     families.append(family)
                     #print(name, acc_fold, acc_roll, acc_roll-acc_fold)
 
-    all_data = np.array([data_fold, data_roll, data_diff, actual_energy, RNAfold_energy, rollout_energy], dtype=float)
+    all_data = np.array([data_fold, data_roll, data_diff, actual_energy, RNAfold_energy, rollout_energy, seq_lens, runtime, actual_MFE, RNAfold_MFE, rollout_MFE], dtype=float)
     DATA_FOLD = 0
     DATA_ROLL = 1
     DATA_DIFF = 2
-    ACTUAL_ENERGY = 3    
-    RNAFOLD_ENERGY = 4
-    ROLLOUT_ENERGY = 5
+    ACTUAL_FOLDABILITY = 3    
+    RNAFOLD_FOLDABILITY = 4
+    ROLLOUT_FOLDABILITY = 5
+    SEQ_LEN = 6
+    RUNTIME = 7
+    ACTUAL_MFE = 8
+    RNAFOLD_MFE = 9
+    ROLLOUT_MFE = 10
     sort = all_data[DATA_DIFF].argsort()
     all_data = all_data[:,sort]
     names = np.array(names, dtype=str)[sort]
     families = np.array(families)[sort]
 
+    statistic, pvalue = ttest_ind(all_data[DATA_FOLD], all_data[DATA_ROLL])
 
-    print("{}\t{:.4f}\t{:.4f}\t{:.4f}\t{:.4f}".format(out_number, np.mean(all_data[ROLLOUT_ENERGY]), np.mean(all_data[DATA_ROLL]), np.median(all_data[DATA_ROLL]), np.mean(all_data[DATA_DIFF])))
+    print("{},{:.4f},{:.4f},{:.4f},{:.4f},{:.4f},{:.4f}".format(out_number, np.mean(all_data[ROLLOUT_FOLDABILITY]), np.mean(all_data[DATA_ROLL]), np.median(all_data[DATA_ROLL]), np.mean(all_data[DATA_DIFF]), np.std(all_data[DATA_DIFF]), pvalue))
 
     with open("scores_{}.dat".format(out_number), 'w') as f:
         for n, d in zip(names, all_data.T):
@@ -137,62 +155,149 @@ def main(rank):
     mpl.rc('xtick', labelsize=18)
     mpl.rc('ytick', labelsize=18)
 
-    #how accurate is foldability??
-    plt.figure()
     fnames = sorted(list(set(families)))
-    for fname in fnames:
-        model = LinearRegression()
-        model.fit(all_data[ROLLOUT_ENERGY][families == fname].reshape(-1, 1), all_data[DATA_ROLL][families == fname].reshape(-1, 1))
-        mi = min(all_data[ROLLOUT_ENERGY])
-        ma = max(all_data[ROLLOUT_ENERGY])
-        modelX =  np.linspace(mi, ma, 100)
-        modelY = model.predict(modelX[:, np.newaxis])
-        plt.scatter(all_data[ROLLOUT_ENERGY][families == fname], all_data[DATA_ROLL][families == fname], label=fname+' {:.2f}'.format(model.score(all_data[ROLLOUT_ENERGY][families == fname].reshape(-1, 1), all_data[DATA_ROLL][families == fname].reshape(-1, 1))))
-        plt.plot(modelX, modelY)
-    plt.xlabel("ENTRNA foldability")
-    plt.ylabel("MCC")
-    plt.legend(fontsize=14)
-    plt.tight_layout()
-    plt.savefig("foldability_{}.pdf".format(out_number))
-    plt.close()
+    best_RNAfold = all_data[DATA_FOLD] > 0.9
+    best_rollout = all_data[DATA_ROLL] > 0.9
 
     #comparison scatterplot
-    plt.figure()
+    fig, ax = plt.subplots()
     for fname in fnames:
-        plt.scatter(all_data[DATA_FOLD][families == fname], all_data[DATA_ROLL][families == fname], label=fname, alpha=0.4)
-        plt.xlabel("RNAfold MCC")
-        plt.ylabel("Rollout MCC")
-        plt.legend(fontsize=14)
-        plt.tight_layout()
-        plt.savefig("scatter_comparison_{}.pdf".format(out_number))
+        ax.scatter(all_data[DATA_FOLD][families == fname], all_data[DATA_ROLL][families == fname], label=fname, alpha=0.4)
+    ax.set_xlabel("RNAfold MCC")
+    ax.set_ylabel("ExpertRNA MCC")
+    ax.legend(fontsize=14)
+    ax.spines['right'].set_visible(False)
+    ax.spines['top'].set_visible(False)    
+    plt.tight_layout()
+    plt.savefig("scatter_comparison_{}.pdf".format(out_number))
     plt.close()
 
     #histograms!
-    plt.figure()
     #overlay
-    plt.hist(data_fold, bins=50, range=(-1, 1), alpha=0.4, label="RNAfold")
-    plt.hist(data_roll, bins=50, range=(-1, 1), alpha=0.4, label="Rollout")
-    plt.xlabel("Matthews Correlation Coefficient")
-    plt.ylabel("Number")
-    plt.legend(fontsize=14)
+    fig, ax = plt.subplots()
+    ax.hist(data_fold, bins=50, range=(-1, 1), alpha=0.4, label="RNAfold")
+    ax.hist(data_roll, bins=50, range=(-1, 1), alpha=0.4, label="ExpertRNA")
+    ax.set_xlabel("Matthews Correlation Coefficient")
+    ax.set_ylabel("Number")
+    ax.legend(fontsize=14)
+    ax.spines['right'].set_visible(False)
+    ax.spines['top'].set_visible(False)
     plt.tight_layout()
     plt.savefig("comparison_{}.pdf".format(out_number))
     plt.close()
 
     #difference
-    plt.hist(data_diff, bins=20)
-    plt.xlabel("MCC difference (Rollout-RNAfold)")
-    plt.ylabel("Number")
+    fig, ax = plt.subplots()
+    ax.hist(data_diff, bins=20)
+    ax.set_xlabel("MCC difference (ExpertRNA-RNAfold)")
+    ax.set_ylabel("Number")
+    ax.spines['right'].set_visible(False)
+    ax.spines['top'].set_visible(False)
+    plt.tight_layout()
     plt.savefig("diff_{}.pdf".format(out_number))
     plt.close()
 
+    #runtime
+    fig, ax = plt.subplots()
+    def func(x, a, b, c):
+        return a * np.power(2, b*x) + c
+    def func2(x, a, b, c):
+        return a*np.power(x, 2) + b * x + c
+    #popt, pcov = curve_fit(func, all_data[SEQ_LEN], all_data[RUNTIME])
+    popt2, pcov2 = curve_fit(func2, all_data[SEQ_LEN], all_data[RUNTIME])
+    mi = min(all_data[SEQ_LEN])
+    ma = max(all_data[SEQ_LEN])
+    modelX = np.linspace(mi, ma, 100)
+    modelY = func2(modelX, *popt2)
+    ax.scatter(all_data[SEQ_LEN], all_data[RUNTIME])
+    ax.plot(modelX, modelY, label = r"quadratic fit ${:.2f}x^{{2}} + {:.2f}x + {:.2f}$".format(popt2[0], popt2[1], popt2[2]))
+    ax.set_xlabel("Sequence Length")
+    ax.set_ylabel("Runtime (s)")
+    ax.legend(fontsize=14)
+    ax.spines['right'].set_visible(False)
+    ax.spines['top'].set_visible(False)
+    plt.tight_layout()
+    plt.savefig("runtime_{}.pdf".format(out_number))
+    plt.close()
+
+    #actual vs rollout MFE
+    fig, ax = plt.subplots()
+    line = np.linspace(-0.6, 0, 20)
+    for fname in fnames:
+        ax.scatter(all_data[ACTUAL_MFE][families == fname] / all_data[SEQ_LEN][families == fname], all_data[ROLLOUT_MFE][families == fname] / all_data[SEQ_LEN][families == fname], label=fname, alpha=0.4)
+    ax.scatter(all_data[ACTUAL_MFE][best_rollout] / all_data[SEQ_LEN][best_rollout], all_data[ROLLOUT_MFE][best_rollout] / all_data[SEQ_LEN][best_rollout], c='darkred', s=8, label="Best ExpertRNA")
+    ax.scatter(all_data[ACTUAL_MFE][best_RNAfold] / all_data[SEQ_LEN][best_RNAfold], all_data[ROLLOUT_MFE][best_RNAfold] / all_data[SEQ_LEN][best_RNAfold], c='mediumblue', s=4, label="Best RNAfold")
+    ax.plot(line, line, c='k', label=r'$x = y$', linewidth=0.75)
+    ax.set_xlabel("Actual MFE (normalized)")
+    ax.set_ylabel("ExpertRNA MFE (normalized)")
+    ax.spines['right'].set_visible(False)
+    ax.spines['top'].set_visible(False)
+    ax.axis('scaled')
+    leg = ax.legend(fontsize=14, bbox_to_anchor=(1.04, 1))
+    plt.tight_layout()
+    plt.savefig("actual_roll_MFE_comparison_{}.pdf".format(out_number), bbox_extra_artists=[leg], bbox_inches='tight')
+    plt.close()
+
+    #actual vs RNAfold MFE
+    fig, ax = plt.subplots()
+    for fname in fnames:
+        ax.scatter(all_data[ACTUAL_MFE][families == fname] / all_data[SEQ_LEN][families == fname], all_data[RNAFOLD_MFE][families == fname] / all_data[SEQ_LEN][families == fname], label=fname, alpha=0.4)
+    ax.scatter(all_data[ACTUAL_MFE][best_rollout] / all_data[SEQ_LEN][best_rollout], all_data[RNAFOLD_MFE][best_rollout] / all_data[SEQ_LEN][best_rollout], c='darkred', s=8, label="Best ExpertRNA")
+    ax.scatter(all_data[ACTUAL_MFE][best_RNAfold] / all_data[SEQ_LEN][best_RNAfold], all_data[RNAFOLD_MFE][best_RNAfold] / all_data[SEQ_LEN][best_RNAfold], c='mediumblue', s=4, label="Best RNAfold")
+    ax.plot(line, line, c='k', label=r'$x = y$', linewidth=0.75)
+    ax.set_xlabel("Actual MFE (normalized)")
+    ax.set_ylabel("RNAfold MFE (normalized)")
+    ax.spines['right'].set_visible(False)
+    ax.spines['top'].set_visible(False)
+    ax.axis('scaled')
+    leg = ax.legend(fontsize=14, bbox_to_anchor=(1.04, 1))
+    plt.tight_layout()
+    plt.savefig("actual_RNAfold_MFE_comparison_{}.pdf".format(out_number), bbox_extra_artists=[leg], bbox_inches='tight')
+    plt.close()
+
+    #RNAfold MFE vs Rollout MFE
+    fig, ax = plt.subplots()
+    line = np.linspace(-0.7, -0.1, 20)
+    for fname in fnames:
+        ax.scatter(all_data[RNAFOLD_MFE][families == fname] / all_data[SEQ_LEN][families == fname], all_data[ROLLOUT_MFE][families == fname] / all_data[SEQ_LEN][families == fname], label=fname, alpha=0.4)
+    ax.scatter(all_data[RNAFOLD_MFE][best_rollout] / all_data[SEQ_LEN][best_rollout], all_data[ROLLOUT_MFE][best_rollout] / all_data[SEQ_LEN][best_rollout], c='darkred', s=8, label="Best ExpertRNA")
+    ax.scatter(all_data[RNAFOLD_MFE][best_RNAfold] / all_data[SEQ_LEN][best_RNAfold], all_data[ROLLOUT_MFE][best_RNAfold] / all_data[SEQ_LEN][best_RNAfold], c='mediumblue', s=4, label="Best RNAfold")
+    ax.plot(line, line, c='k', label=r'$x = y$', linewidth=0.75)
+    ax.set_xlabel("RNAfold MFE (normalized)")
+    ax.set_ylabel("ExpertRNA MFE (normalized)")
+    ax.spines['right'].set_visible(False)
+    ax.spines['top'].set_visible(False)
+    ax.axis('scaled')
+    leg = ax.legend(fontsize=14, bbox_to_anchor=(1.04, 1))
+    fig.tight_layout()
+    plt.savefig("RNAfold_roll_MFE_comparison_{}.pdf".format(out_number), bbox_extra_artists=[leg], bbox_inches='tight')
+    plt.close()
+
+        #how accurate is foldability??
+    #plt.figure()
+    #for fname in fnames:
+    #    model = LinearRegression()
+    #    model.fit(all_data[ROLLOUT_FOLDABILITY][families == fname].reshape(-1, 1), all_data[DATA_ROLL][families == fname].reshape(-1, 1))
+    #    mi = min(all_data[ROLLOUT_FOLDABILITY])
+    #    ma = max(all_data[ROLLOUT_FOLDABILITY])
+    #    modelX =  np.linspace(mi, ma, 100)
+    #    modelY = model.predict(modelX[:, np.newaxis])
+    #    plt.scatter(all_data[ROLLOUT_FOLDABILITY][families == fname], all_data[DATA_ROLL][families == fname], label=fname+' {:.2f}'.format(model.score(all_data[ROLLOUT_FOLDABILITY][families == fname].reshape(-1, 1), all_data[DATA_ROLL][families == fname].reshape(-1, 1))))
+    #    plt.plot(modelX, modelY)
+    #plt.xlabel("ENTRNA foldability")
+    #plt.ylabel("MCC")
+    #plt.legend(fontsize=14)
+    #plt.tight_layout()
+    #plt.savefig("foldability_{}.pdf".format(out_number))
+    #plt.close()
+
     #plt.figure(figsize=(len(all_data[DATA_FOLD])/18, 20))
-    #ma = np.max(np.array([np.max(all_data[RNAFOLD_ENERGY]), np.max(all_data[ROLLOUT_ENERGY])]))
-    #mi = np.min(np.array([np.min(all_data[RNAFOLD_ENERGY]), np.min(all_data[ROLLOUT_ENERGY])]))
+    #ma = np.max(np.array([np.max(all_data[RNAFOLD_FOLDABILITY]), np.max(all_data[ROLLOUT_FOLDABILITY])]))
+    #mi = np.min(np.array([np.min(all_data[RNAFOLD_FOLDABILITY]), np.min(all_data[ROLLOUT_FOLDABILITY])]))
     ##cmap = mpl.cm.viridis
     ##norm = mpl.colors.Normalize(vmin=mi, vmax=ma)
-    #a = plt.scatter(range(len(all_data[DATA_FOLD])), all_data[DATA_FOLD], c=all_data[RNAFOLD_ENERGY], cmap='viridis', vmin=mi, vmax=ma, marker='o', label="RNAfold")
-    #b = plt.scatter(range(len(all_data[DATA_FOLD])), all_data[DATA_ROLL], c=all_data[ROLLOUT_ENERGY], cmap='viridis', vmin=mi, vmax=ma, marker='v', label="Rollout")
+    #a = plt.scatter(range(len(all_data[DATA_FOLD])), all_data[DATA_FOLD], c=all_data[RNAFOLD_FOLDABILITY], cmap='viridis', vmin=mi, vmax=ma, marker='o', label="RNAfold")
+    #b = plt.scatter(range(len(all_data[DATA_FOLD])), all_data[DATA_ROLL], c=all_data[ROLLOUT_FOLDABILITY], cmap='viridis', vmin=mi, vmax=ma, marker='v', label="Rollout")
     #plt.legend(handles=[a, b], fontsize=14)
     #plt.colorbar(label='Free energy')
     #plt.xlabel("Structure")
@@ -205,7 +310,7 @@ def main(rank):
     #plt.close()
 
 if __name__ == "__main__":
-    print('\tavg_fold\tavg_mcc\tmedian_mcc\tavg_improvement')
+    print('branch,avg_fold,avg_mcc,median_mcc,avg_improvement,stdev_improvement,pvaule')
     for i in range(5):
         main(i)
     #main(0)
