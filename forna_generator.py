@@ -4,6 +4,7 @@ url = ''
 files = listdir()
 names = list(set(["_".join(f.split("_")[:-1]) for f in files if "fasta" in f]))
 for n in names:
+    print(n)
     for t in ["actual", "RNAfold", "rollout"]:
         url = 'http://rna.tbi.univie.ac.at/forna/forna.html?id=fasta&file='
 

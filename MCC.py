@@ -7,12 +7,12 @@ from sklearn.linear_model import LinearRegression
 from scipy.optimize import curve_fit
 from scipy.stats import ttest_ind
 
-def calc_MCC(prediction, actual, name, alg):
+def calc_MCC(prediction, actual, name, out_number, alg):
     TP = 0
     TN = 0
     FP = 0
     FN = 0
-    with open("{}_{}_colormap.col".format(name, alg), 'w+') as f:
+    with open("{}_{}_{}_colormap.col".format(name, out_number, alg), 'w+') as f:
 
         for i, (a, b) in enumerate(zip(prediction, actual)):
             #true
@@ -58,8 +58,8 @@ def parse_dot_bracket(input):
 
     return output
 
-def make_fasta_db(name, alg, seq, struct):
-    with open("{}_{}.fasta".format(name, alg), 'w+') as f:
+def make_fasta_db(name, out_number, alg, seq, struct):
+    with open("{}_{}_{}.fasta".format(name, out_number, alg), 'w+') as f:
         f.write(">"+name+"\n")
         f.write(seq+"\n")
         f.write(struct+"\n")
@@ -109,14 +109,14 @@ def main(rank):
                     RNAfold_MFE.append(float(l[26]))
                     rollout_MFE.append(float(l[27]))
                     
-                    make_fasta_db(name, "actual", seq, actual)
-                    make_fasta_db(name, "RNAfold", seq, RNAfold)
-                    make_fasta_db(name, "rollout", seq, rollout)
+                    make_fasta_db(name, out_number, "actual", seq, actual)
+                    make_fasta_db(name, out_number, "RNAfold", seq, RNAfold)
+                    make_fasta_db(name, out_number, "rollout", seq, rollout)
                     actual = parse_dot_bracket(actual)            
                     rollout = parse_dot_bracket(rollout)
                     RNAfold = parse_dot_bracket(RNAfold)
-                    acc_fold = calc_MCC(RNAfold, actual, name, "RNAfold")
-                    acc_roll = calc_MCC(rollout, actual, name, "rollout")
+                    acc_fold = calc_MCC(RNAfold, actual, name, out_number, "RNAfold")
+                    acc_roll = calc_MCC(rollout, actual, name, out_number, "rollout")
                     data_fold.append(acc_fold)
                     data_roll.append(acc_roll)
                     data_diff.append(acc_roll - acc_fold)
@@ -165,6 +165,7 @@ def main(rank):
         ax.scatter(all_data[DATA_FOLD][families == fname], all_data[DATA_ROLL][families == fname], label=fname, alpha=0.4)
     ax.set_xlabel("RNAfold MCC")
     ax.set_ylabel("ExpertRNA MCC")
+    ax.set_xlim(-1, 1.1)
     ax.legend(fontsize=14)
     ax.spines['right'].set_visible(False)
     ax.spines['top'].set_visible(False)    
@@ -179,6 +180,7 @@ def main(rank):
     ax.hist(data_roll, bins=50, range=(-1, 1), alpha=0.4, label="ExpertRNA")
     ax.set_xlabel("Matthews Correlation Coefficient")
     ax.set_ylabel("Number")
+    ax.set_xlim(-1, 1.2)
     ax.legend(fontsize=14)
     ax.spines['right'].set_visible(False)
     ax.spines['top'].set_visible(False)
@@ -188,11 +190,12 @@ def main(rank):
 
     #difference
     fig, ax = plt.subplots()
-    ax.hist(data_diff, bins=20)
+    ax.hist(data_diff, range=(-1,1), bins=30)
     ax.set_xlabel("MCC difference (ExpertRNA-RNAfold)")
     ax.set_ylabel("Number")
     ax.spines['right'].set_visible(False)
     ax.spines['top'].set_visible(False)
+    ax.set_xlim(-1, 1.2)
     plt.tight_layout()
     plt.savefig("diff_{}.pdf".format(out_number))
     plt.close()
@@ -225,9 +228,9 @@ def main(rank):
     line = np.linspace(-0.6, 0, 20)
     for fname in fnames:
         ax.scatter(all_data[ACTUAL_MFE][families == fname] / all_data[SEQ_LEN][families == fname], all_data[ROLLOUT_MFE][families == fname] / all_data[SEQ_LEN][families == fname], label=fname, alpha=0.4)
-    ax.scatter(all_data[ACTUAL_MFE][best_rollout] / all_data[SEQ_LEN][best_rollout], all_data[ROLLOUT_MFE][best_rollout] / all_data[SEQ_LEN][best_rollout], c='darkred', s=8, label="Best ExpertRNA")
-    ax.scatter(all_data[ACTUAL_MFE][best_RNAfold] / all_data[SEQ_LEN][best_RNAfold], all_data[ROLLOUT_MFE][best_RNAfold] / all_data[SEQ_LEN][best_RNAfold], c='mediumblue', s=4, label="Best RNAfold")
-    ax.plot(line, line, c='k', label=r'$x = y$', linewidth=0.75)
+    ax.scatter(all_data[ACTUAL_MFE][best_rollout] / all_data[SEQ_LEN][best_rollout], all_data[ROLLOUT_MFE][best_rollout] / all_data[SEQ_LEN][best_rollout], c='red', s=8, label="Best ExpertRNA")
+    ax.scatter(all_data[ACTUAL_MFE][best_RNAfold] / all_data[SEQ_LEN][best_RNAfold], all_data[ROLLOUT_MFE][best_RNAfold] / all_data[SEQ_LEN][best_RNAfold], c='cyan', s=4, label="Best RNAfold")
+    ax.plot(line, line, c='k', linewidth=0.75)
     ax.set_xlabel("Actual MFE (normalized)")
     ax.set_ylabel("ExpertRNA MFE (normalized)")
     ax.spines['right'].set_visible(False)
@@ -242,9 +245,9 @@ def main(rank):
     fig, ax = plt.subplots()
     for fname in fnames:
         ax.scatter(all_data[ACTUAL_MFE][families == fname] / all_data[SEQ_LEN][families == fname], all_data[RNAFOLD_MFE][families == fname] / all_data[SEQ_LEN][families == fname], label=fname, alpha=0.4)
-    ax.scatter(all_data[ACTUAL_MFE][best_rollout] / all_data[SEQ_LEN][best_rollout], all_data[RNAFOLD_MFE][best_rollout] / all_data[SEQ_LEN][best_rollout], c='darkred', s=8, label="Best ExpertRNA")
-    ax.scatter(all_data[ACTUAL_MFE][best_RNAfold] / all_data[SEQ_LEN][best_RNAfold], all_data[RNAFOLD_MFE][best_RNAfold] / all_data[SEQ_LEN][best_RNAfold], c='mediumblue', s=4, label="Best RNAfold")
-    ax.plot(line, line, c='k', label=r'$x = y$', linewidth=0.75)
+    ax.scatter(all_data[ACTUAL_MFE][best_rollout] / all_data[SEQ_LEN][best_rollout], all_data[RNAFOLD_MFE][best_rollout] / all_data[SEQ_LEN][best_rollout], c='red', s=8, label="Best ExpertRNA")
+    ax.scatter(all_data[ACTUAL_MFE][best_RNAfold] / all_data[SEQ_LEN][best_RNAfold], all_data[RNAFOLD_MFE][best_RNAfold] / all_data[SEQ_LEN][best_RNAfold], c='cyan', s=4, label="Best RNAfold")
+    ax.plot(line, line, c='k', linewidth=0.75)
     ax.set_xlabel("Actual MFE (normalized)")
     ax.set_ylabel("RNAfold MFE (normalized)")
     ax.spines['right'].set_visible(False)
@@ -260,9 +263,9 @@ def main(rank):
     line = np.linspace(-0.7, -0.1, 20)
     for fname in fnames:
         ax.scatter(all_data[RNAFOLD_MFE][families == fname] / all_data[SEQ_LEN][families == fname], all_data[ROLLOUT_MFE][families == fname] / all_data[SEQ_LEN][families == fname], label=fname, alpha=0.4)
-    ax.scatter(all_data[RNAFOLD_MFE][best_rollout] / all_data[SEQ_LEN][best_rollout], all_data[ROLLOUT_MFE][best_rollout] / all_data[SEQ_LEN][best_rollout], c='darkred', s=8, label="Best ExpertRNA")
-    ax.scatter(all_data[RNAFOLD_MFE][best_RNAfold] / all_data[SEQ_LEN][best_RNAfold], all_data[ROLLOUT_MFE][best_RNAfold] / all_data[SEQ_LEN][best_RNAfold], c='mediumblue', s=4, label="Best RNAfold")
-    ax.plot(line, line, c='k', label=r'$x = y$', linewidth=0.75)
+    ax.scatter(all_data[RNAFOLD_MFE][best_rollout] / all_data[SEQ_LEN][best_rollout], all_data[ROLLOUT_MFE][best_rollout] / all_data[SEQ_LEN][best_rollout], c='red', s=8, label="Best ExpertRNA")
+    ax.scatter(all_data[RNAFOLD_MFE][best_RNAfold] / all_data[SEQ_LEN][best_RNAfold], all_data[ROLLOUT_MFE][best_RNAfold] / all_data[SEQ_LEN][best_RNAfold], c='cyan', s=4, label="Best RNAfold")
+    ax.plot(line, line, c='k', linewidth=0.75)
     ax.set_xlabel("RNAfold MFE (normalized)")
     ax.set_ylabel("ExpertRNA MFE (normalized)")
     ax.spines['right'].set_visible(False)
