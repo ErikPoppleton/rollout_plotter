@@ -76,9 +76,12 @@ def main(rank):
     data_fold = []
     data_roll = []
     data_diff = []
-    actual_energy = []
-    RNAfold_energy = []
-    rollout_energy = []
+    actual_foldabilityMFE = []
+    RNAfold_foldabilityMFE = []
+    rollout_foldabilityMFE = []
+    actual_foldabilityNFE = []
+    RNAfold_foldabilityNFE = []
+    rollout_foldabilityNFE = []
     runtime = []
     actual_MFE = []
     RNAfold_MFE = []
@@ -101,9 +104,12 @@ def main(rank):
                     RNAfold = l[3]
                     rollout = l[4]
                     family = name.split("_")[0]
-                    actual_energy.append(float(l[5]))
-                    RNAfold_energy.append(float(l[6]))
-                    rollout_energy.append(float(l[7]))
+                    actual_foldabilityMFE.append(float(l[5]))
+                    RNAfold_foldabilityMFE.append(float(l[6]))
+                    rollout_foldabilityMFE.append(float(l[7]))
+                    actual_foldabilityNFE.append(float(l[17]))
+                    RNAfold_foldabilityNFE.append(float(l[20]))
+                    rollout_foldabilityNFE.append(float(l[23]))
                     runtime.append(float(l[15]))
                     actual_MFE.append(float(l[25]))
                     RNAfold_MFE.append(float(l[26]))
@@ -124,49 +130,56 @@ def main(rank):
                     families.append(family)
                     #print(name, acc_fold, acc_roll, acc_roll-acc_fold)
 
-    all_data = np.array([data_fold, data_roll, data_diff, actual_energy, RNAfold_energy, rollout_energy, seq_lens, runtime, actual_MFE, RNAfold_MFE, rollout_MFE], dtype=float)
+    all_data = np.array([data_fold, data_roll, data_diff, actual_foldabilityMFE, RNAfold_foldabilityMFE, rollout_foldabilityMFE, seq_lens, runtime, actual_MFE, RNAfold_MFE, rollout_MFE, actual_foldabilityNFE, RNAfold_foldabilityNFE, rollout_foldabilityNFE], dtype=float)
     DATA_FOLD = 0
     DATA_ROLL = 1
     DATA_DIFF = 2
-    ACTUAL_FOLDABILITY = 3    
-    RNAFOLD_FOLDABILITY = 4
-    ROLLOUT_FOLDABILITY = 5
+    ACTUAL_FOLDABILITY_MFE = 3    
+    RNAFOLD_FOLDABILITY_MFE = 4
+    ROLLOUT_FOLDABILITY_MFE = 5
     SEQ_LEN = 6
     RUNTIME = 7
     ACTUAL_MFE = 8
     RNAFOLD_MFE = 9
     ROLLOUT_MFE = 10
+    ACTUAL_FOLDABILITY_NFE = 11
+    RNAFOLD_FOLDABILITY_NFE = 12
+    ROLLOUT_FOLDABILITY_NFE = 13
     sort = all_data[DATA_DIFF].argsort()
     all_data = all_data[:,sort]
     names = np.array(names, dtype=str)[sort]
     families = np.array(families)[sort]
+    good_MFE = all_data[ACTUAL_MFE] < 5
 
     statistic, pvalue = ttest_ind(all_data[DATA_FOLD], all_data[DATA_ROLL])
 
-    print("{},{:.4f},{:.4f},{:.4f},{:.4f},{:.4f},{:.4f}".format(out_number, np.mean(all_data[ROLLOUT_FOLDABILITY]), np.mean(all_data[DATA_ROLL]), np.median(all_data[DATA_ROLL]), np.mean(all_data[DATA_DIFF]), np.std(all_data[DATA_DIFF]), pvalue))
+    print("{},{:.4f},{:.4f},{:.4f},{:.4f},{:.4f}".format(out_number, np.mean(all_data[DATA_ROLL]), np.median(all_data[DATA_ROLL]), np.mean(all_data[DATA_DIFF]), np.std(all_data[DATA_DIFF]), pvalue))
 
     with open("scores_{}.dat".format(out_number), 'w') as f:
         for n, d in zip(names, all_data.T):
             f.write("{} {} {} {}\n".format(n, d[DATA_FOLD], d[DATA_ROLL], d[DATA_DIFF]))
 
 
-    mpl.rcParams.update({'font.size': 22})
+    mpl.rcParams.update({'font.size': 12, 'lines.markersize' : 2})
     mpl.rc('text', usetex=True)
-    mpl.rc('xtick', labelsize=18)
-    mpl.rc('ytick', labelsize=18)
+    mpl.rc('xtick', labelsize=8)
+    mpl.rc('ytick', labelsize=8)
+    W2 = np.array(plt.rcParams["figure.figsize"])*2.6/plt.rcParams["figure.figsize"][0] #for 2 graphs across with the same width as the text column in PLOS
+    W3 = np.array(plt.rcParams["figure.figsize"])*2.5/plt.rcParams["figure.figsize"][0] #for 3 graphs across the whole page in PLOS
+    WeqH = np.array([2.6, 2.6])
 
     fnames = sorted(list(set(families)))
     best_RNAfold = all_data[DATA_FOLD] > 0.9
     best_rollout = all_data[DATA_ROLL] > 0.9
 
     #comparison scatterplot
-    fig, ax = plt.subplots()
+    fig, ax = plt.subplots(figsize=W2)
     for fname in fnames:
         ax.scatter(all_data[DATA_FOLD][families == fname], all_data[DATA_ROLL][families == fname], label=fname, alpha=0.4)
     ax.set_xlabel("RNAfold MCC")
     ax.set_ylabel("ExpertRNA MCC")
     ax.set_xlim(-1, 1.1)
-    ax.legend(fontsize=14)
+    ax.legend(fontsize=8)
     ax.spines['right'].set_visible(False)
     ax.spines['top'].set_visible(False)    
     plt.tight_layout()
@@ -175,13 +188,13 @@ def main(rank):
 
     #histograms!
     #overlay
-    fig, ax = plt.subplots()
+    fig, ax = plt.subplots(figsize=W2)
     ax.hist(data_fold, bins=50, range=(-1, 1), alpha=0.4, label="RNAfold")
     ax.hist(data_roll, bins=50, range=(-1, 1), alpha=0.4, label="ExpertRNA")
-    ax.set_xlabel("Matthews Correlation Coefficient")
+    ax.set_xlabel("MCC")
     ax.set_ylabel("Number")
-    ax.set_xlim(-1, 1.2)
-    ax.legend(fontsize=14)
+    ax.set_xlim(-1, 1)
+    ax.legend(fontsize=8)
     ax.spines['right'].set_visible(False)
     ax.spines['top'].set_visible(False)
     plt.tight_layout()
@@ -189,22 +202,22 @@ def main(rank):
     plt.close()
 
     #difference
-    fig, ax = plt.subplots()
-    ax.hist(data_diff, range=(-1,1), bins=30)
-    ax.set_xlabel("MCC difference (ExpertRNA-RNAfold)")
+    fig, ax = plt.subplots(figsize=W2)
+    ax.hist(data_diff, range=(-1.4,1.4), bins=28)
+    ax.set_xlabel("MCC difference")
     ax.set_ylabel("Number")
     ax.spines['right'].set_visible(False)
     ax.spines['top'].set_visible(False)
-    ax.set_xlim(-1, 1.2)
+    ax.set_xlim(-1.4, 1.4)
     plt.tight_layout()
     plt.savefig("diff_{}.pdf".format(out_number))
     plt.close()
 
     #runtime
-    fig, ax = plt.subplots()
-    def func(x, a, b, c):
+    fig, ax = plt.subplots(figsize=W2)
+    def func(x, a, b, c): #exponential fit
         return a * np.power(2, b*x) + c
-    def func2(x, a, b, c):
+    def func2(x, a, b, c): #polynomial fit (worked better)
         return a*np.power(x, 2) + b * x + c
     #popt, pcov = curve_fit(func, all_data[SEQ_LEN], all_data[RUNTIME])
     popt2, pcov2 = curve_fit(func2, all_data[SEQ_LEN], all_data[RUNTIME])
@@ -216,7 +229,7 @@ def main(rank):
     ax.plot(modelX, modelY, label = r"quadratic fit ${:.2f}x^{{2}} + {:.2f}x + {:.2f}$".format(popt2[0], popt2[1], popt2[2]))
     ax.set_xlabel("Sequence Length")
     ax.set_ylabel("Runtime (s)")
-    ax.legend(fontsize=14)
+    ax.legend(fontsize=8)
     ax.spines['right'].set_visible(False)
     ax.spines['top'].set_visible(False)
     plt.tight_layout()
@@ -224,56 +237,164 @@ def main(rank):
     plt.close()
 
     #actual vs rollout MFE
-    fig, ax = plt.subplots()
+    fig, ax = plt.subplots(figsize=WeqH)
     line = np.linspace(-0.6, 0, 20)
     for fname in fnames:
-        ax.scatter(all_data[ACTUAL_MFE][families == fname] / all_data[SEQ_LEN][families == fname], all_data[ROLLOUT_MFE][families == fname] / all_data[SEQ_LEN][families == fname], label=fname, alpha=0.4)
-    ax.scatter(all_data[ACTUAL_MFE][best_rollout] / all_data[SEQ_LEN][best_rollout], all_data[ROLLOUT_MFE][best_rollout] / all_data[SEQ_LEN][best_rollout], c='red', s=8, label="Best ExpertRNA")
-    ax.scatter(all_data[ACTUAL_MFE][best_RNAfold] / all_data[SEQ_LEN][best_RNAfold], all_data[ROLLOUT_MFE][best_RNAfold] / all_data[SEQ_LEN][best_RNAfold], c='cyan', s=4, label="Best RNAfold")
+        ax.scatter(all_data[ACTUAL_MFE][good_MFE][families[good_MFE] == fname] / all_data[SEQ_LEN][good_MFE][families[good_MFE] == fname], all_data[ROLLOUT_MFE][good_MFE][families[good_MFE] == fname] / all_data[SEQ_LEN][good_MFE][families[good_MFE] == fname], label=fname, alpha=0.4)
+    ax.scatter(all_data[ACTUAL_MFE][best_rollout] / all_data[SEQ_LEN][best_rollout], all_data[ROLLOUT_MFE][best_rollout] / all_data[SEQ_LEN][best_rollout], c='red', s=1, label="Best ExpertRNA")
+    ax.scatter(all_data[ACTUAL_MFE][best_RNAfold] / all_data[SEQ_LEN][best_RNAfold], all_data[ROLLOUT_MFE][best_RNAfold] / all_data[SEQ_LEN][best_RNAfold], c='cyan', s=0.5, label="Best RNAfold")
     ax.plot(line, line, c='k', linewidth=0.75)
-    ax.set_xlabel("Actual MFE (normalized)")
-    ax.set_ylabel("ExpertRNA MFE (normalized)")
+    ax.set_xlabel("Actual MFE")
+    ax.set_ylabel("ExpertRNA MFE")
     ax.spines['right'].set_visible(False)
     ax.spines['top'].set_visible(False)
     ax.axis('scaled')
-    leg = ax.legend(fontsize=14, bbox_to_anchor=(1.04, 1))
+    #leg = ax.legend(fontsize=8, bbox_to_anchor=(1.04, 1))
     plt.tight_layout()
-    plt.savefig("actual_roll_MFE_comparison_{}.pdf".format(out_number), bbox_extra_artists=[leg], bbox_inches='tight')
+    plt.savefig("actual_roll_MFE_comparison_{}.pdf".format(out_number))#, bbox_extra_artists=[leg], bbox_inches='tight')
     plt.close()
 
     #actual vs RNAfold MFE
-    fig, ax = plt.subplots()
+    fig, ax = plt.subplots(figsize=WeqH)
     for fname in fnames:
-        ax.scatter(all_data[ACTUAL_MFE][families == fname] / all_data[SEQ_LEN][families == fname], all_data[RNAFOLD_MFE][families == fname] / all_data[SEQ_LEN][families == fname], label=fname, alpha=0.4)
-    ax.scatter(all_data[ACTUAL_MFE][best_rollout] / all_data[SEQ_LEN][best_rollout], all_data[RNAFOLD_MFE][best_rollout] / all_data[SEQ_LEN][best_rollout], c='red', s=8, label="Best ExpertRNA")
-    ax.scatter(all_data[ACTUAL_MFE][best_RNAfold] / all_data[SEQ_LEN][best_RNAfold], all_data[RNAFOLD_MFE][best_RNAfold] / all_data[SEQ_LEN][best_RNAfold], c='cyan', s=4, label="Best RNAfold")
+        ax.scatter(all_data[ACTUAL_MFE][good_MFE][families[good_MFE] == fname] / all_data[SEQ_LEN][good_MFE][families[good_MFE] == fname], all_data[RNAFOLD_MFE][good_MFE][families[good_MFE] == fname] / all_data[SEQ_LEN][good_MFE][families[good_MFE] == fname], label=fname, alpha=0.4)
+    ax.scatter(all_data[ACTUAL_MFE][best_rollout] / all_data[SEQ_LEN][best_rollout], all_data[RNAFOLD_MFE][best_rollout] / all_data[SEQ_LEN][best_rollout], c='red', s=1, label="Best ExpertRNA")
+    ax.scatter(all_data[ACTUAL_MFE][best_RNAfold] / all_data[SEQ_LEN][best_RNAfold], all_data[RNAFOLD_MFE][best_RNAfold] / all_data[SEQ_LEN][best_RNAfold], c='cyan', s=0.5, label="Best RNAfold")
     ax.plot(line, line, c='k', linewidth=0.75)
-    ax.set_xlabel("Actual MFE (normalized)")
-    ax.set_ylabel("RNAfold MFE (normalized)")
+    ax.set_xlabel("Actual MFE")
+    ax.set_ylabel("RNAfold MFE")
     ax.spines['right'].set_visible(False)
     ax.spines['top'].set_visible(False)
     ax.axis('scaled')
-    leg = ax.legend(fontsize=14, bbox_to_anchor=(1.04, 1))
+    #leg = ax.legend(fontsize=8, bbox_to_anchor=(1.04, 1))
     plt.tight_layout()
-    plt.savefig("actual_RNAfold_MFE_comparison_{}.pdf".format(out_number), bbox_extra_artists=[leg], bbox_inches='tight')
+    plt.savefig("actual_RNAfold_MFE_comparison_{}.pdf".format(out_number))#, bbox_extra_artists=[leg], bbox_inches='tight')
     plt.close()
 
     #RNAfold MFE vs Rollout MFE
-    fig, ax = plt.subplots()
+    fig, ax = plt.subplots(figsize=WeqH)
     line = np.linspace(-0.7, -0.1, 20)
     for fname in fnames:
         ax.scatter(all_data[RNAFOLD_MFE][families == fname] / all_data[SEQ_LEN][families == fname], all_data[ROLLOUT_MFE][families == fname] / all_data[SEQ_LEN][families == fname], label=fname, alpha=0.4)
-    ax.scatter(all_data[RNAFOLD_MFE][best_rollout] / all_data[SEQ_LEN][best_rollout], all_data[ROLLOUT_MFE][best_rollout] / all_data[SEQ_LEN][best_rollout], c='red', s=8, label="Best ExpertRNA")
-    ax.scatter(all_data[RNAFOLD_MFE][best_RNAfold] / all_data[SEQ_LEN][best_RNAfold], all_data[ROLLOUT_MFE][best_RNAfold] / all_data[SEQ_LEN][best_RNAfold], c='cyan', s=4, label="Best RNAfold")
+    ax.scatter(all_data[RNAFOLD_MFE][best_rollout] / all_data[SEQ_LEN][best_rollout], all_data[ROLLOUT_MFE][best_rollout] / all_data[SEQ_LEN][best_rollout], c='red', s=1, label="Best ExpertRNA")
+    ax.scatter(all_data[RNAFOLD_MFE][best_RNAfold] / all_data[SEQ_LEN][best_RNAfold], all_data[ROLLOUT_MFE][best_RNAfold] / all_data[SEQ_LEN][best_RNAfold], c='cyan', s=0.5, label="Best RNAfold")
     ax.plot(line, line, c='k', linewidth=0.75)
-    ax.set_xlabel("RNAfold MFE (normalized)")
-    ax.set_ylabel("ExpertRNA MFE (normalized)")
+    ax.set_xlabel("RNAfold MFE")
+    ax.set_ylabel("ExpertRNA MFE")
     ax.spines['right'].set_visible(False)
     ax.spines['top'].set_visible(False)
     ax.axis('scaled')
-    leg = ax.legend(fontsize=14, bbox_to_anchor=(1.04, 1))
+    #leg = ax.legend(fontsize=8, bbox_to_anchor=(1.04, 1))
     fig.tight_layout()
-    plt.savefig("RNAfold_roll_MFE_comparison_{}.pdf".format(out_number), bbox_extra_artists=[leg], bbox_inches='tight')
+    plt.savefig("RNAfold_roll_MFE_comparison_{}.pdf".format(out_number))#, bbox_extra_artists=[leg], bbox_inches='tight')
+    plt.close()
+
+    #actual vs rollout foldability
+    fig, ax = plt.subplots(figsize=WeqH)
+    line = np.linspace(0, 1, 20)
+    for fname in fnames:
+        ax.scatter(all_data[ACTUAL_FOLDABILITY_MFE][families == fname], all_data[ROLLOUT_FOLDABILITY_MFE][families == fname], label=fname, alpha=0.4)
+    ax.scatter(all_data[ACTUAL_FOLDABILITY_MFE][best_rollout], all_data[ROLLOUT_FOLDABILITY_MFE][best_rollout], c='red', s=1, label="Best ExpertRNA")
+    ax.scatter(all_data[ACTUAL_FOLDABILITY_MFE][best_RNAfold], all_data[ROLLOUT_FOLDABILITY_MFE][best_RNAfold], c='cyan', s=0.5, label="Best RNAfold")
+    ax.plot(line, line, c='k', linewidth=0.75)
+    ax.set_xlabel("Actual foldability", wrap=True)
+    ax.set_ylabel("ExpertRNA foldability", wrap=True)
+    ax.spines['right'].set_visible(False)
+    ax.spines['top'].set_visible(False)
+    ax.axis('scaled')
+    #leg = ax.legend(fontsize=8, bbox_to_anchor=(1.04, 1))
+    fig.tight_layout()
+    plt.savefig("actual_roll_foldabilityMFE_comparison_{}.pdf".format(out_number))#, bbox_extra_artists=[leg], bbox_inches='tight')
+    plt.close()
+
+    #actual vs RNAfold foldability
+    fig, ax = plt.subplots(figsize=WeqH)
+    line = np.linspace(0, 1, 20)
+    for fname in fnames:
+        ax.scatter(all_data[ACTUAL_FOLDABILITY_MFE][families == fname], all_data[RNAFOLD_FOLDABILITY_MFE][families == fname], label=fname, alpha=0.4)
+    ax.scatter(all_data[ACTUAL_FOLDABILITY_MFE][best_rollout], all_data[RNAFOLD_FOLDABILITY_MFE][best_rollout], c='red', s=1, label="Best ExpertRNA")
+    ax.scatter(all_data[ACTUAL_FOLDABILITY_MFE][best_RNAfold], all_data[RNAFOLD_FOLDABILITY_MFE][best_RNAfold], c='cyan', s=0.5, label="Best RNAfold")
+    ax.plot(line, line, c='k', linewidth=0.75)
+    ax.set_xlabel("Actual foldability")
+    ax.set_ylabel("RNAfold foldability")
+    ax.spines['right'].set_visible(False)
+    ax.spines['top'].set_visible(False)
+    ax.axis('scaled')
+    #leg = ax.legend(fontsize=8, bbox_to_anchor=(1.04, 1))
+    fig.tight_layout()
+    plt.savefig("actual_RNAfold_foldabilityMFE_comparison_{}.pdf".format(out_number))#, bbox_extra_artists=[leg], bbox_inches='tight')
+    plt.close()
+
+    #RNAfold vs rollout foldability
+    fig, ax = plt.subplots(figsize=WeqH)
+    line = np.linspace(0, 1, 20)
+    for fname in fnames:
+        ax.scatter(all_data[RNAFOLD_FOLDABILITY_MFE][families == fname], all_data[ROLLOUT_FOLDABILITY_MFE][families == fname], label=fname, alpha=0.4)
+    ax.scatter(all_data[RNAFOLD_FOLDABILITY_MFE][best_rollout], all_data[ROLLOUT_FOLDABILITY_MFE][best_rollout], c='red', s=1, label="Best ExpertRNA")
+    ax.scatter(all_data[RNAFOLD_FOLDABILITY_MFE][best_RNAfold], all_data[ROLLOUT_FOLDABILITY_MFE][best_RNAfold], c='cyan', s=0.5, label="Best RNAfold")
+    ax.plot(line, line, c='k', linewidth=0.75)
+    ax.set_xlabel("RNAfold foldability")
+    ax.set_ylabel("ExpertRNA foldability")
+    ax.spines['right'].set_visible(False)
+    ax.spines['top'].set_visible(False)
+    ax.axis('scaled')
+    #leg = ax.legend(fontsize=8, bbox_to_anchor=(1.04, 1))
+    fig.tight_layout()
+    plt.savefig("RNAfold_roll_foldabilityMFE_comparison_{}.pdf".format(out_number))#, bbox_extra_artists=[leg], bbox_inches='tight')
+    plt.close()
+
+    #actual vs rollout foldability
+    fig, ax = plt.subplots(figsize=WeqH)
+    line = np.linspace(0, 1, 20)
+    for fname in fnames:
+        ax.scatter(all_data[ACTUAL_FOLDABILITY_NFE][families == fname], all_data[ROLLOUT_FOLDABILITY_NFE][families == fname], label=fname, alpha=0.4)
+    ax.scatter(all_data[ACTUAL_FOLDABILITY_NFE][best_rollout], all_data[ROLLOUT_FOLDABILITY_NFE][best_rollout], c='red', s=1, label="Best ExpertRNA")
+    ax.scatter(all_data[ACTUAL_FOLDABILITY_NFE][best_RNAfold], all_data[ROLLOUT_FOLDABILITY_NFE][best_RNAfold], c='cyan', s=0.5, label="Best RNAfold")
+    ax.plot(line, line, c='k', linewidth=0.75)
+    ax.set_xlabel("Actual foldability")
+    ax.set_ylabel("ExpertRNA foldability")
+    ax.spines['right'].set_visible(False)
+    ax.spines['top'].set_visible(False)
+    ax.axis('scaled')
+    #leg = ax.legend(fontsize=8, bbox_to_anchor=(1.04, 1))
+    fig.tight_layout()
+    plt.savefig("actual_roll_foldabilityNFE_comparison_{}.pdf".format(out_number))#, bbox_extra_artists=[leg], bbox_inches='tight')
+    plt.close()
+
+    #actual vs RNAfold foldability
+    fig, ax = plt.subplots(figsize=WeqH)
+    line = np.linspace(0, 1, 20)
+    for fname in fnames:
+        ax.scatter(all_data[ACTUAL_FOLDABILITY_NFE][families == fname], all_data[RNAFOLD_FOLDABILITY_NFE][families == fname], label=fname, alpha=0.4)
+    ax.scatter(all_data[ACTUAL_FOLDABILITY_NFE][best_rollout], all_data[RNAFOLD_FOLDABILITY_NFE][best_rollout], c='red', s=1, label="Best ExpertRNA")
+    ax.scatter(all_data[ACTUAL_FOLDABILITY_NFE][best_RNAfold], all_data[RNAFOLD_FOLDABILITY_NFE][best_RNAfold], c='cyan', s=0.5, label="Best RNAfold")
+    ax.plot(line, line, c='k', linewidth=0.75)
+    ax.set_xlabel("Actual foldability")
+    ax.set_ylabel("RNAfold foldability")
+    ax.spines['right'].set_visible(False)
+    ax.spines['top'].set_visible(False)
+    ax.axis('scaled')
+    #leg = ax.legend(fontsize=8, bbox_to_anchor=(1.04, 1))
+    fig.tight_layout()
+    plt.savefig("actual_RNAfold_foldabilityNFE_comparison_{}.pdf".format(out_number))#, bbox_extra_artists=[leg], bbox_inches='tight')
+    plt.close()
+
+    #RNAfold vs rollout foldability
+    fig, ax = plt.subplots(figsize=WeqH)
+    line = np.linspace(0, 1, 20)
+    for fname in fnames:
+        ax.scatter(all_data[RNAFOLD_FOLDABILITY_NFE][families == fname], all_data[ROLLOUT_FOLDABILITY_NFE][families == fname], label=fname, alpha=0.4)
+    ax.scatter(all_data[RNAFOLD_FOLDABILITY_NFE][best_rollout], all_data[ROLLOUT_FOLDABILITY_NFE][best_rollout], c='red', s=1, label="Best ExpertRNA")
+    ax.scatter(all_data[RNAFOLD_FOLDABILITY_NFE][best_RNAfold], all_data[ROLLOUT_FOLDABILITY_NFE][best_RNAfold], c='cyan', s=0.5, label="Best RNAfold")
+    ax.plot(line, line, c='k', linewidth=0.75)
+    ax.set_xlabel("RNAfold foldability")
+    ax.set_ylabel("ExpertRNA foldability")
+    ax.spines['right'].set_visible(False)
+    ax.spines['top'].set_visible(False)
+    ax.axis('scaled')
+    #leg = ax.legend(fontsize=8, bbox_to_anchor=(1.04, 1))
+    fig.tight_layout()
+    plt.savefig("RNAfold_roll_foldabilityNFE_comparison_{}.pdf".format(out_number))#, bbox_extra_artists=[leg], bbox_inches='tight')
     plt.close()
 
         #how accurate is foldability??
