@@ -160,7 +160,7 @@ def main(rank):
 
     statistic, pvalue = ttest_ind(all_data[DATA_FOLD], all_data[DATA_ROLL])
 
-    #print("{},{:.4f},{:.4f},{:.4f},{:.4f},{:.4f}".format(out_number, np.mean(all_data[DATA_ROLL]), np.median(all_data[DATA_ROLL]), np.mean(all_data[DATA_DIFF]), np.std(all_data[DATA_DIFF]), pvalue))
+    print("{},{:.4f},{:.4f},{:.4f},{:.4f},{:.4f}".format(out_number, np.mean(all_data[DATA_ROLL]), np.median(all_data[DATA_ROLL]), np.mean(all_data[DATA_DIFF]), np.std(all_data[DATA_DIFF]), pvalue))
 
     with open("scores_{}.dat".format(out_number), 'w') as f:
         for n, d in zip(names, all_data.T):
@@ -180,7 +180,7 @@ def main(rank):
         fnames[1], fnames[2], fnames[3] = fnames[2], fnames[3], fnames[1]
     best_RNAfold = all_data[DATA_FOLD] > 0.9
     best_rollout = all_data[DATA_ROLL] > 0.9
-    """
+    """   
     less_best_rollout = all_data[DATA_ROLL] > 0.8
     less_worst_RNAfold = all_data[DATA_FOLD] < 0.8
     sameMCC = all_data[DATA_ROLL] == all_data[DATA_FOLD]
@@ -219,7 +219,6 @@ def main(rank):
     print("number with foldability diff > 5%: ", len(good_fold_bad_roll_big_diff))
     print("as a percentage: ", len(good_fold_bad_roll_big_diff) / len(names[~sameMCC]))
     """
-
     #comparison scatterplot
     fig, ax = plt.subplots(figsize=W3)
     for fname in fnames:
@@ -460,7 +459,7 @@ def main(rank):
     bbox = leg.get_window_extent().transformed(fig.dpi_scale_trans.inverted())
     fig2.savefig("legend.png", dpi="figure", bbox_inches=bbox)
 
-        #how accurate is foldability??
+    #how accurate is foldability??
     #plt.figure()
     #for fname in fnames:
     #    model = LinearRegression()
@@ -495,9 +494,9 @@ def main(rank):
     #plt.tight_layout() 
     #plt.savefig("all_data_{}.png".format(out_number))
     #plt.close()
+    
 
 if __name__ == "__main__":
-    #print('branch,avg_fold,avg_mcc,median_mcc,avg_improvement,stdev_improvement,pvaule')
-    #for i in range(5):
-    #    main(i)
-    main(1)
+    print('branch,avg_mcc,median_mcc,avg_improvement,stdev_improvement,pvaule')
+    for i in range(1,5):
+        main(i)
