@@ -14,7 +14,7 @@ for fi in files:
         with open(fi, 'r') as f:
             data = f.readlines()
             for d in data:
-                name = d.split(',')[0]
+                name = d.split(',')[1]
                 if name != previous_name or sub_name_count > 4:
                     sub_name_count = 0
 

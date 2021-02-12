@@ -94,33 +94,33 @@ def main(rank):
         if fname.split(".")[-1] == "csv":
             with open(fname, "r") as f:
                 lines = f.readlines()
-                for l in lines[rank::step]:
+                for l in lines[rank::step]: #first line is a header, so ranks are 1-indexed.
                     l = l.split(",")
                     if l[0] == 'NONE':
                         continue
-                    name = l[0]
-                    seq = l[1]
+                    name = l[1]
+                    seq = l[2]
                     seq_lens.append(len(seq))
-                    actual = l[2]
-                    RNAfold = l[3]
-                    rollout = l[4]
+                    actual = l[3]
+                    RNAfold = l[4]
+                    rollout = l[5]
                     family = name.split("_")[0]
-                    actual_foldabilityMFE.append(float(l[16]))
-                    RNAfold_foldabilityMFE.append(float(l[19]))
-                    rollout_foldabilityMFE.append(float(l[22]))
-                    actual_foldabilityNFE.append(float(l[17]))
-                    RNAfold_foldabilityNFE.append(float(l[20]))
-                    rollout_foldabilityNFE.append(float(l[23]))
-                    if rank == 1 and step == 4 and float(l[20]) > float(l[23]) and 'NFE' in fname and not 'MFE' in fname:
+                    actual_foldabilityMFE.append(float(l[14]))
+                    RNAfold_foldabilityMFE.append(float(l[17]))
+                    rollout_foldabilityMFE.append(float(l[20]))
+                    actual_foldabilityNFE.append(float(l[15]))
+                    RNAfold_foldabilityNFE.append(float(l[18]))
+                    rollout_foldabilityNFE.append(float(l[21]))
+                    if rank == 1 and step == 4 and float(l[18]) > float(l[21]) and 'NFE' in fname and not 'MFE' in fname:
                         count += 1
-                        print(count, name, float(l[20]), float(l[23]))
-                    elif rank == 1 and step ==4 and float(l[19]) > float(l[22]) and 'MFE' in fname and not 'NFE' in fname:
+                        print(count, name, float(l[18]), float(l[21])) #structures where RNAfold had higher foldability than ExpertRNA
+                    elif rank == 1 and step ==4 and float(l[17]) > float(l[20]) and 'MFE' in fname and not 'NFE' in fname:
                         count += 1
-                        print(count, name, float(l[20]), float(l[23]))
-                    runtime.append(float(l[15]))
-                    actual_MFE.append(float(l[25]))
-                    RNAfold_MFE.append(float(l[26]))
-                    rollout_MFE.append(float(l[27]))
+                        print(count, name, float(l[17]), float(l[20])) #structures where RNAfold had higher foldability than expertRNA
+                    runtime.append(float(l[13]))
+                    actual_MFE.append(float(l[23]))
+                    RNAfold_MFE.append(float(l[24]))
+                    rollout_MFE.append(float(l[25]))
                     
                     make_fasta_db(name, out_number, "actual", seq, actual)
                     make_fasta_db(name, out_number, "RNAfold", seq, RNAfold)
@@ -220,15 +220,19 @@ def main(rank):
     print("as a percentage: ", len(good_fold_bad_roll_big_diff) / len(names[~sameMCC]))
     """
     #comparison scatterplot
-    fig, ax = plt.subplots(figsize=W3)
+    fig, ax = plt.subplots(figsize=WeqH)
     for fname in fnames:
         ax.scatter(all_data[DATA_FOLD][families == fname], all_data[DATA_ROLL][families == fname], label=fname, alpha=0.4)
+    line = np.linspace(-1, 1, 20)
+    ax.plot(line, line, c='k', linewidth=0.75)
     ax.set_xlabel("RNAfold MCC")
     ax.set_ylabel("ExpertRNA MCC")
-    ax.set_xlim(-1, 1.1)
+    ax.set_xlim(-1.1, 1.1)
+    ax.set_ylim(-1.1, 1.1)
     #ax.legend(fontsize=8), bbox_to_anchor=(1.04, 1))
     ax.spines['right'].set_visible(False)
-    ax.spines['top'].set_visible(False)    
+    ax.spines['top'].set_visible(False)  
+    ax.axis('scaled')  
     plt.tight_layout()
     plt.savefig("scatter_comparison_{}.png".format(out_number), dpi=600)
     plt.close()
@@ -272,11 +276,11 @@ def main(rank):
     ma = max(all_data[SEQ_LEN])
     modelX = np.linspace(mi, ma, 100)
     modelY = func2(modelX, *popt2)
-    ax.scatter(all_data[SEQ_LEN], all_data[RUNTIME])
-    ax.plot(modelX, modelY, label = r"quadratic fit ${:.2f}x^{{2}} + {:.2f}x + {:.2f}$".format(popt2[0], popt2[1], popt2[2]))
+    ax.scatter(all_data[SEQ_LEN], all_data[RUNTIME], alpha=0.4)
+    ax.plot(modelX, modelY, label=r"quadratic fit ${:.2f}x^{{2}} + {:.2f}x + {:.2f}$".format(popt2[0], popt2[1], popt2[2]), linewidth=0.75, c='k')
     ax.set_xlabel("Sequence Length")
     ax.set_ylabel("Runtime (s)")
-    ax.legend(fontsize=8)
+    ax.legend(fontsize=4)
     ax.spines['right'].set_visible(False)
     ax.spines['top'].set_visible(False)
     plt.tight_layout()
@@ -500,3 +504,4 @@ if __name__ == "__main__":
     print('branch,avg_mcc,median_mcc,avg_improvement,stdev_improvement,pvaule')
     for i in range(1,5):
         main(i)
+    #main(1)
